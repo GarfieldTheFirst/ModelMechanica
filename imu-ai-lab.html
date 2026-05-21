@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Mobile AI Lab</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Space+Grotesk:wght@300;400;600;700&display=swap');
+
+  :root {
+    --bg: #0a0c10;
+    --surface: #111318;
+    --surface2: #181c23;
+    --border: #232830;
+    --accent: #00e5ff;
+    --accent2: #ff4f7b;
+    --accent3: #7cfc6e;
+    --warn: #ffb700;
+    --text: #e8eaf0;
+    --muted: #5a6070;
+    --mono: 'DM Mono', monospace;
+    --sans: 'Space Grotesk', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100dvh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* HEADER */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .header-sub {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: var(--mono);
+    letter-spacing: 0.08em;
+  }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    box-shadow: 0 0 0 2px transparent;
+    transition: all 0.3s;
+  }
+  .status-dot.active {
+    background: var(--accent3);
+    box-shadow: 0 0 8px var(--accent3);
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* TABS */
+  .tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    position: sticky;
+    top: 57px;
+    z-index: 99;
+  }
+  .tab-btn {
+    padding: 12px 4px 10px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-family: var(--sans);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+  .tab-btn .tab-icon { font-size: 16px; }
+  .tab-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  /* PANELS */
+  .panel { display: none; padding: 16px 16px 80px; }
+  .panel.active { display: block; }
+
+  /* SENSOR BUTTON */
+  .start-btn {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, var(--accent) 0%, #0099bb 100%);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    margin-bottom: 16px;
+    transition: opacity 0.2s;
+  }
+  .start-btn:active { opacity: 0.8; }
+  .start-btn.stop {
+    background: linear-gradient(135deg, var(--accent2) 0%, #cc2255 100%);
+  }
+
+  /* CANVAS */
+  .chart-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .chart-label {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  canvas {
+    width: 100%;
+    display: block;
+    border-radius: 4px;
+  }
+
+  /* METRIC CARDS */
+  .metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 8px;
+    text-align: center;
+  }
+  .metric-val {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 3px;
+  }
+  .metric-val.warn { color: var(--warn); }
+  .metric-val.alert { color: var(--accent2); }
+  .metric-label {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ANOMALY */
+  .anomaly-indicator {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: border-color 0.3s;
+  }
+  .anomaly-indicator.triggered {
+    border-color: var(--accent2);
+    background: rgba(255,79,123,0.07);
+  }
+  .anomaly-icon {
+    font-size: 28px;
+    line-height: 1;
+    transition: transform 0.2s;
+  }
+  .anomaly-indicator.triggered .anomaly-icon {
+    animation: shake 0.4s;
+  }
+  @keyframes shake {
+    0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)}
+  }
+  .anomaly-text { flex: 1; }
+  .anomaly-status {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent3);
+    margin-bottom: 2px;
+  }
+  .anomaly-indicator.triggered .anomaly-status { color: var(--accent2); }
+  .anomaly-desc {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+  .anomaly-score {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--accent3);
+    text-align: right;
+  }
+  .anomaly-indicator.triggered .anomaly-score { color: var(--accent2); }
+  .anomaly-score-label { font-size: 9px; color: var(--muted); letter-spacing:0.06em; text-transform:uppercase; }
+
+  /* ALGO INFO */
+  .algo-info {
+    background: var(--surface2);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 6px 6px 0;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.6;
+    font-family: var(--mono);
+  }
+  .algo-info strong { color: var(--accent); font-weight: 500; }
+
+  /* TREND */
+  .trend-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .stat-val {
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+  .stat-label { font-size: 10px; color: var(--muted); letter-spacing:0.07em; text-transform:uppercase; }
+  .stat-val.up { color: var(--accent2); }
+  .stat-val.down { color: var(--accent3); }
+
+  /* LOG */
+  .event-log {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    max-height: 160px;
+    overflow-y: auto;
+  }
+  .log-title { font-size: 10px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; font-family: var(--mono); }
+  .log-entry {
+    display: flex;
+    gap: 8px;
+    font-size: 10px;
+    font-family: var(--mono);
+    padding: 3px 0;
+    border-bottom: 1px solid var(--border);
+    animation: fadeIn 0.3s;
+  }
+  .log-entry:last-child { border: none; }
+  @keyframes fadeIn { from { opacity:0; transform: translateY(-4px); } to { opacity:1; transform:none; } }
+  .log-time { color: var(--muted); flex-shrink:0; }
+  .log-msg { color: var(--text); }
+  .log-msg.alert { color: var(--accent2); }
+  .log-msg.ok { color: var(--accent3); }
+
+  /* PERMISSION NOTE */
+  .permission-note {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    margin-bottom: 12px;
+    line-height: 1.5;
+  }
+  .permission-note span { color: var(--warn); }
+
+  /* SECTION TITLE */
+  .section-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+    margin-top: 4px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-title">Mobile AI Lab</div>
+    <div class="header-sub" id="headerSub">IMU · Signal Processing · ML</div>
+  </div>
+  <div class="status-dot" id="statusDot"></div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab(0)">
+    <span class="tab-icon">📡</span>Live Signal
+  </button>
+  <button class="tab-btn" onclick="switchTab(1)">
+    <span class="tab-icon">🔍</span>Anomalie
+  </button>
+  <button class="tab-btn" onclick="switchTab(2)">
+    <span class="tab-icon">📈</span>Trend
+  </button>
+</div>
+
+<!-- TAB 0: LIVE SIGNAL -->
+<div class="panel active" id="panel-0">
+  <button class="start-btn" id="startBtn" onclick="toggleSensor()">▶ Sensor starten</button>
+
+  <div class="permission-note" id="permNote">
+    <span>ℹ</span> Auf iOS: Seite via Safari öffnen.<br>
+    Sensor-Zugriff erfordert HTTPS &amp; Browser-Erlaubnis.
+  </div>
+
+  <div class="metrics">
+    <div class="metric-card">
+      <div class="metric-val" id="valX">—</div>
+      <div class="metric-label">X m/s²</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-val" id="valY">—</div>
+      <div class="metric-label">Y m/s²</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-val" id="valZ">—</div>
+      <div class="metric-label">Z m/s²</div>
+    </div>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="chart-label">
+      <span>BESCHLEUNIGUNG — ALLE ACHSEN</span>
+      <span id="sampleRate" style="color:var(--accent3)">-- Hz</span>
+    </div>
+    <canvas id="rawCanvas" height="140"></canvas>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="chart-label">
+      <span>MAGNITUDE  |a| = √(x²+y²+z²)</span>
+    </div>
+    <canvas id="magCanvas" height="90"></canvas>
+  </div>
+
+  <div class="algo-info">
+    <strong>Methode:</strong> Direkte IMU-Rohdaten via DeviceMotion API.<br>
+    Sample-Rate: ~50–100 Hz je nach Gerät.<br>
+    Magnitude normalisiert (0g = Ruhezustand).
+  </div>
+</div>
+
+<!-- TAB 1: ANOMALIE -->
+<div class="panel" id="panel-1">
+  <div class="section-title">Anomalie-Erkennung · Z-Score Methode</div>
+
+  <div class="anomaly-indicator" id="anomalyBox">
+    <div class="anomaly-icon" id="anomalyIcon">✅</div>
+    <div class="anomaly-text">
+      <div class="anomaly-status" id="anomalyStatus">NORMALBETRIEB</div>
+      <div class="anomaly-desc" id="anomalyDesc">Kein signifikantes Ereignis erkannt</div>
+    </div>
+    <div>
+      <div class="anomaly-score" id="zScoreDisplay">0.00</div>
+      <div class="anomaly-score-label">Z-Score</div>
+    </div>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="chart-label">
+      <span>Z-SCORE VERLAUF</span>
+      <span style="color:var(--accent2)">— Schwelle: 2.5σ</span>
+    </div>
+    <canvas id="zCanvas" height="120"></canvas>
+  </div>
+
+  <div class="metrics">
+    <div class="metric-card">
+      <div class="metric-val" id="anomalyCount">0</div>
+      <div class="metric-label">Events</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-val" id="meanVal">—</div>
+      <div class="metric-label">Ø Mag.</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-val" id="stdVal">—</div>
+      <div class="metric-label">σ Std.abw.</div>
+    </div>
+  </div>
+
+  <div class="algo-info">
+    <strong>Algorithmus:</strong> Rollender Z-Score über 100-Sample-Fenster.<br>
+    Z = (x − μ) / σ &nbsp;·&nbsp; Schwelle: |Z| &gt; 2.5<br>
+    Baseline-Adaptation nach 200 Samples.
+  </div>
+
+  <div class="event-log">
+    <div class="log-title">Event-Log</div>
+    <div id="logEntries"></div>
+  </div>
+</div>
+
+<!-- TAB 2: TREND -->
+<div class="panel" id="panel-2">
+  <div class="section-title">Trendanalyse &amp; Prognose · Lineare Regression</div>
+
+  <div class="chart-wrap">
+    <div class="chart-label">
+      <span>ENERGIE-TREND (RMS) + PROGNOSE</span>
+      <span style="color:var(--warn)">— Forecast</span>
+    </div>
+    <canvas id="trendCanvas" height="160"></canvas>
+  </div>
+
+  <div class="trend-stats">
+    <div class="stat-card">
+      <div class="stat-val" id="trendSlope">—</div>
+      <div class="stat-label">Steigung / 10s</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="trendR2">—</div>
+      <div class="stat-label">R² Güte</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="trendForecast">—</div>
+      <div class="stat-label">Prognose +10s</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="trendDir">—</div>
+      <div class="stat-label">Tendenz</div>
+    </div>
+  </div>
+
+  <div class="algo-info">
+    <strong>Methode:</strong> RMS-Energie in 1s-Fenstern → Lineare Regression.<br>
+    Prognose: Extrapolation der Regressionsgerade um 10s.<br>
+    R² zeigt Modellgüte (1.0 = perfekte Linearität).
+  </div>
+</div>
+
+<script>
+// ─── STATE ────────────────────────────────────────────────────────────
+const VIEW_SECS   = 5;     // sichtbares Zeitfenster in Sekunden
+const ANOM_WIN    = 100;   // Fenster für Z-Score (samples)
+const ANOM_THRESH = 2.5;
+const MAX_SAMPLES = 2000;  // absoluter Ringpuffer-Deckel
+
+// Zeitgestempelter Ringpuffer: jedes Element { t, x, y, z, mag }
+let samples = [];
+
+let bufZ_score = [];  // parallel, gleiche Länge wie samples
+let rmsBuffer  = [];  // 1s-RMS-Werte mit Zeitstempel { t, rms }
+
+let anomalyCount = 0;
+let sampleCount  = 0;
+let fpsTimer     = Date.now();
+let displayHz    = 0;
+
+let running  = false;
+let demoMode = false;
+let demoT    = 0;
+
+// ─── TAB SWITCHING ────────────────────────────────────────────────────
+function switchTab(i) {
+  document.querySelectorAll('.tab-btn').forEach((b,j) => b.classList.toggle('active', i===j));
+  document.querySelectorAll('.panel').forEach((p,j) => p.classList.toggle('active', i===j));
+}
+
+// ─── SENSOR START/STOP ────────────────────────────────────────────────
+async function toggleSensor() {
+  if (running) {
+    stopSensor();
+  } else {
+    await startSensor();
+  }
+}
+
+async function startSensor() {
+  // iOS 13+ permission
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+    try {
+      const perm = await DeviceMotionEvent.requestPermission();
+      if (perm !== 'granted') { startDemo(); return; }
+    } catch(e) { startDemo(); return; }
+  }
+
+  if (typeof DeviceMotionEvent === 'undefined') {
+    startDemo(); return;
+  }
+
+  window.addEventListener('devicemotion', onMotion);
+  setRunning(true);
+  addLog('Sensor gestartet', 'ok');
+}
+
+function stopSensor() {
+  window.removeEventListener('devicemotion', onMotion);
+  if (demoMode) { demoMode = false; }
+  setRunning(false);
+  addLog('Sensor gestoppt', '');
+}
+
+function startDemo() {
+  demoMode = true;
+  setRunning(true);
+  addLog('Demo-Modus aktiv (simulierte Daten)', 'ok');
+  runDemo();
+}
+
+function setRunning(r) {
+  running = r;
+  document.getElementById('startBtn').textContent = r ? '⏹ Sensor stoppen' : '▶ Sensor starten';
+  document.getElementById('startBtn').classList.toggle('stop', r);
+  document.getElementById('statusDot').classList.toggle('active', r);
+}
+
+// ─── DEMO DATA ────────────────────────────────────────────────────────
+function runDemo() {
+  if (!running || !demoMode) return;
+  demoT += 0.05;
+  // Simulate: baseline vibration + occasional spikes
+  const spike = (Math.random() < 0.015) ? (Math.random() * 12 + 5) * (Math.random()<0.5?1:-1) : 0;
+  const drift = demoT * 0.003; // slight upward trend
+  const ax = Math.sin(demoT * 3.1) * 0.8 + Math.random()*0.3 - 0.15 + drift + spike*0.3;
+  const ay = Math.cos(demoT * 2.4) * 0.6 + Math.random()*0.25 + drift + spike*0.5;
+  const az = 9.81 + Math.sin(demoT * 1.7) * 0.4 + Math.random()*0.2 + spike;
+  pushSample(ax, ay, az);
+  setTimeout(runDemo, 20); // ~50Hz
+}
+
+// ─── MOTION HANDLER ───────────────────────────────────────────────────
+function onMotion(e) {
+  const acc = e.accelerationIncludingGravity || e.acceleration;
+  if (!acc) return;
+  pushSample(acc.x||0, acc.y||0, acc.z||0);
+}
+
+// ─── PUSH SAMPLE ─────────────────────────────────────────────────────
+let rmsAccum = [], rmsTimer = Date.now();
+
+function pushSample(x, y, z) {
+  const t   = Date.now();
+  const mag = Math.sqrt(x*x + y*y + z*z);
+  samples.push({ t, x, y, z, mag });
+
+  // Trim to MAX_SAMPLES hard cap
+  if (samples.length > MAX_SAMPLES) samples.shift();
+
+  // Z-Score over last ANOM_WIN samples
+  const win   = samples.slice(-ANOM_WIN).map(s => s.mag);
+  const mu    = win.reduce((a,b)=>a+b,0) / win.length;
+  const sigma = Math.sqrt(win.reduce((a,b)=>a+(b-mu)**2,0) / win.length);
+  const zs    = sigma > 0.001 ? Math.abs((mag - mu) / sigma) : 0;
+  bufZ_score.push(zs);
+  if (bufZ_score.length > MAX_SAMPLES) bufZ_score.shift();
+
+  if (zs > ANOM_THRESH && samples.length > ANOM_WIN) {
+    anomalyCount++;
+    triggerAnomaly(zs, mag);
+  }
+
+  // RMS accumulation for trend (1s windows)
+  rmsAccum.push(mag * mag);
+  if (t - rmsTimer > 1000) {
+    const rms = Math.sqrt(rmsAccum.reduce((a,b)=>a+b,0) / rmsAccum.length);
+    rmsBuffer.push({ t, rms });
+    if (rmsBuffer.length > 120) rmsBuffer.shift(); // keep 2 min
+    rmsAccum = [];
+    rmsTimer  = t;
+  }
+
+  // Hz counter
+  sampleCount++;
+  if (t - fpsTimer > 1000) {
+    displayHz   = sampleCount;
+    sampleCount = 0;
+    fpsTimer    = t;
+  }
+}
+
+// ─── ANOMALY ─────────────────────────────────────────────────────────
+let anomCooldown = false;
+function triggerAnomaly(zs, mag) {
+  const box = document.getElementById('anomalyBox');
+  box.classList.add('triggered');
+  document.getElementById('anomalyIcon').textContent = '⚠️';
+  document.getElementById('anomalyStatus').textContent = 'ANOMALIE ERKANNT';
+  document.getElementById('anomalyDesc').textContent = `|a| = ${mag.toFixed(2)} m/s²  ·  Z = ${zs.toFixed(2)}`;
+  document.getElementById('anomalyCount').textContent = anomalyCount;
+  if (!anomCooldown) {
+    addLog(`Anomalie: Z=${zs.toFixed(2)}, |a|=${mag.toFixed(2)}`, 'alert');
+    anomCooldown = true;
+    setTimeout(() => anomCooldown = false, 800);
+  }
+  clearTimeout(window._anomTimer);
+  window._anomTimer = setTimeout(() => {
+    box.classList.remove('triggered');
+    document.getElementById('anomalyIcon').textContent = '✅';
+    document.getElementById('anomalyStatus').textContent = 'NORMALBETRIEB';
+    document.getElementById('anomalyDesc').textContent = 'Kein signifikantes Ereignis erkannt';
+  }, 1500);
+}
+
+// ─── LOG ─────────────────────────────────────────────────────────────
+function addLog(msg, type) {
+  const now = new Date();
+  const t = now.toTimeString().slice(0,8);
+  const el = document.createElement('div');
+  el.className = 'log-entry';
+  el.innerHTML = `<span class="log-time">${t}</span><span class="log-msg ${type}">${msg}</span>`;
+  const logEl = document.getElementById('logEntries');
+  logEl.insertBefore(el, logEl.firstChild);
+  if (logEl.children.length > 30) logEl.removeChild(logEl.lastChild);
+}
+
+
+// ─── CANVAS ───────────────────────────────────────────────────────────
+const canvasCache = new Map();
+
+function initCanvas(c) {
+  const dpr = window.devicePixelRatio || 1;
+  const r   = c.getBoundingClientRect();
+  const W   = r.width;
+  const H   = parseFloat(c.getAttribute('height'));
+  c.width   = W * dpr;
+  c.height  = H * dpr;
+  const ctx = c.getContext('2d');
+  ctx.scale(dpr, dpr);
+  canvasCache.set(c.id, { ctx, W, H });
+  return [ctx, W, H];
+}
+
+function resizeCanvas(c) {
+  const dpr = window.devicePixelRatio || 1;
+  const r   = c.getBoundingClientRect();
+  const W   = r.width;
+  const H   = parseFloat(c.getAttribute('height'));
+  const hit = canvasCache.get(c.id);
+  if (hit && Math.abs(hit.W - W) < 1) return [hit.ctx, hit.W, hit.H];
+  c.width   = W * dpr;
+  c.height  = H * dpr;
+  const ctx = c.getContext('2d');
+  ctx.scale(dpr, dpr);
+  canvasCache.set(c.id, { ctx, W, H });
+  return [ctx, W, H];
+}
+
+function initAllCanvases() {
+  ['rawCanvas','magCanvas','zCanvas','trendCanvas'].forEach(id => {
+    const c = document.getElementById(id);
+    if (c) initCanvas(c);
+  });
+}
+window.addEventListener('resize', initAllCanvases);
+setTimeout(initAllCanvases, 120);
+
+// ─── DRAW HELPERS ─────────────────────────────────────────────────────
+function drawGrid(ctx, W, H, rows) {
+  rows = rows || 4;
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth   = 1;
+  for (let i = 1; i < rows; i++) {
+    const y = (i / rows) * H;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+  for (let s = 1; s < VIEW_SECS; s++) {
+    const x = (s / VIEW_SECS) * W;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+}
+
+function drawTimeAxis(ctx, W, H) {
+  ctx.fillStyle = 'rgba(90,96,112,0.75)';
+  ctx.font      = '8px DM Mono';
+  ctx.textAlign = 'center';
+  for (let s = 0; s <= VIEW_SECS; s++) {
+    const x   = (s / VIEW_SECS) * W;
+    const lbl = s === VIEW_SECS ? '0s' : '-' + (VIEW_SECS - s) + 's';
+    ctx.fillText(lbl, x, H - 2);
+  }
+  ctx.textAlign = 'left';
+}
+
+function tToX(t, now, W) {
+  return ((t - (now - VIEW_SECS * 1000)) / (VIEW_SECS * 1000)) * W;
+}
+
+// ─── WINDOW HELPERS ───────────────────────────────────────────────────
+function getWindow() {
+  const cutoff = Date.now() - VIEW_SECS * 1000;
+  const start  = samples.findIndex(function(s){ return s.t >= cutoff; });
+  if (start === -1) return [];
+  return samples.slice(start);
+}
+
+function getZWindow() {
+  const cutoff = Date.now() - VIEW_SECS * 1000;
+  const start  = samples.findIndex(function(s){ return s.t >= cutoff; });
+  if (start === -1 || start >= bufZ_score.length) return [];
+  return bufZ_score.slice(start);
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────
+let lastRender      = 0;
+const RENDER_INTERVAL = 1000 / 30;
+
+function render(ts) {
+  requestAnimationFrame(render);
+  if (ts - lastRender < RENDER_INTERVAL) return;
+  lastRender = ts;
+
+  const now = Date.now();
+  const win = getWindow();
+
+  // ── TAB 0: RAW SIGNALS ─────────────────────────────────────────
+  var rawC = document.getElementById('rawCanvas');
+  var res  = resizeCanvas(rawC);
+  var rc = res[0], rW = res[1], rH = res[2];
+  rc.fillStyle = '#111318'; rc.fillRect(0, 0, rW, rH);
+  drawGrid(rc, rW, rH, 4);
+
+  if (win.length > 1) {
+    var allV = [];
+    for (var i=0;i<win.length;i++) { allV.push(win[i].x,win[i].y,win[i].z); }
+    var vMin = Math.min.apply(null,allV) - 0.5;
+    var vMax = Math.max.apply(null,allV) + 0.5;
+    var span = vMax - vMin || 1;
+    var PAD  = 12;
+
+    ['x','y','z'].forEach(function(field, fi) {
+      var colors = ['#00e5ff','#ff4f7b','#7cfc6e'];
+      rc.beginPath();
+      for (var i=0;i<win.length;i++) {
+        var x = tToX(win[i].t, now, rW);
+        var y = rH - PAD - ((win[i][field] - vMin) / span) * (rH - PAD - 4);
+        i === 0 ? rc.moveTo(x,y) : rc.lineTo(x,y);
+      }
+      rc.strokeStyle = colors[fi]; rc.lineWidth = 1.5; rc.stroke();
+    });
+  }
+  drawTimeAxis(rc, rW, rH);
+  rc.font='9px DM Mono';
+  rc.fillStyle='#00e5ff'; rc.fillText('X',6,11);
+  rc.fillStyle='#ff4f7b'; rc.fillText('Y',20,11);
+  rc.fillStyle='#7cfc6e'; rc.fillText('Z',34,11);
+
+  // ── TAB 0: MAGNITUDE ───────────────────────────────────────────
+  var magC = document.getElementById('magCanvas');
+  res = resizeCanvas(magC);
+  var mc = res[0], mW = res[1], mH = res[2];
+  mc.fillStyle = '#111318'; mc.fillRect(0, 0, mW, mH);
+  drawGrid(mc, mW, mH, 3);
+
+  if (win.length > 1) {
+    var mags = win.map(function(s){ return s.mag; });
+    var mMin = Math.max(0, Math.min.apply(null,mags) - 0.5);
+    var mMax = Math.max.apply(null,mags) + 0.5;
+    var mSpan = mMax - mMin || 1;
+    var PADm  = 12;
+    // filled area
+    mc.beginPath();
+    mc.moveTo(tToX(win[0].t,now,mW), mH);
+    for (var i=0;i<win.length;i++) {
+      var x = tToX(win[i].t,now,mW);
+      var y = mH - PADm - ((win[i].mag-mMin)/mSpan)*(mH-PADm-4);
+      mc.lineTo(x,y);
+    }
+    mc.lineTo(tToX(win[win.length-1].t,now,mW), mH);
+    mc.closePath();
+    var g = mc.createLinearGradient(0,0,0,mH);
+    g.addColorStop(0,'rgba(0,229,255,0.25)');
+    g.addColorStop(1,'rgba(0,229,255,0)');
+    mc.fillStyle = g; mc.fill();
+    // line
+    mc.beginPath();
+    for (var i=0;i<win.length;i++) {
+      var x = tToX(win[i].t,now,mW);
+      var y = mH - PADm - ((win[i].mag-mMin)/mSpan)*(mH-PADm-4);
+      i===0 ? mc.moveTo(x,y) : mc.lineTo(x,y);
+    }
+    mc.strokeStyle='#00e5ff'; mc.lineWidth=1.5; mc.stroke();
+  }
+  drawTimeAxis(mc, mW, mH);
+
+  // ── TAB 1: Z-SCORE ─────────────────────────────────────────────
+  var zC = document.getElementById('zCanvas');
+  res = resizeCanvas(zC);
+  var zc = res[0], zW = res[1], zH = res[2];
+  zc.fillStyle = '#111318'; zc.fillRect(0, 0, zW, zH);
+  drawGrid(zc, zW, zH, 4);
+
+  var zWin = getZWindow();
+  var zMax = 4;
+  for (var i=0;i<zWin.length;i++) if (zWin[i]>zMax) zMax=zWin[i];
+  var PADz = 12;
+
+  var ty = zH - PADz - (ANOM_THRESH / zMax) * (zH - PADz - 4);
+  zc.beginPath(); zc.strokeStyle='rgba(255,79,123,0.55)'; zc.lineWidth=1;
+  zc.setLineDash([4,3]); zc.moveTo(0,ty); zc.lineTo(zW,ty); zc.stroke(); zc.setLineDash([]);
+  zc.fillStyle='rgba(255,79,123,0.6)'; zc.font='8px DM Mono';
+  zc.fillText('2.5\u03c3', 4, ty-3);
+
+  if (win.length > 1 && zWin.length === win.length) {
+    zc.beginPath();
+    for (var i=0;i<win.length;i++) {
+      var x = tToX(win[i].t, now, zW);
+      var y = zH - PADz - (zWin[i]/zMax)*(zH-PADz-4);
+      i===0 ? zc.moveTo(x,y) : zc.lineTo(x,y);
+    }
+    zc.strokeStyle='#ffb700'; zc.lineWidth=1.5; zc.stroke();
+  }
+  drawTimeAxis(zc, zW, zH);
+
+  // ── TAB 2: TREND ───────────────────────────────────────────────
+  var tC = document.getElementById('trendCanvas');
+  res = resizeCanvas(tC);
+  var tc = res[0], tW = res[1], tH = res[2];
+  tc.fillStyle = '#111318'; tc.fillRect(0, 0, tW, tH);
+  drawGrid(tc, tW, tH, 4);
+
+  if (rmsBuffer.length > 3) {
+    var n     = rmsBuffer.length;
+    var rVals = rmsBuffer.map(function(r){ return r.rms; });
+    var tMin  = Math.min.apply(null,rVals) * 0.92;
+    var tMax2 = Math.max.apply(null,rVals) * 1.12;
+    var tSpan = tMax2 - tMin || 1;
+    var PADt  = 14;
+
+    var mx  = (n-1)/2;
+    var my  = rVals.reduce(function(a,b){ return a+b; },0) / n;
+    var num = 0, den = 0;
+    for (var i=0;i<n;i++) { num += (i-mx)*(rVals[i]-my); den += (i-mx)*(i-mx); }
+    var slope     = den > 0 ? num/den : 0;
+    var intercept = my - slope * mx;
+    var ss_res = 0, ss_tot = 0;
+    for (var i=0;i<n;i++) {
+      ss_res += Math.pow(rVals[i]-(intercept+slope*i),2);
+      ss_tot += Math.pow(rVals[i]-my,2);
+    }
+    var r2 = ss_tot > 0 ? Math.max(0, 1 - ss_res/ss_tot) : 0;
+
+    var FSTEPS = Math.max(5, Math.round(n*0.33));
+    var total  = n + FSTEPS;
+    function toX(i){ return (i/(total-1))*tW; }
+    function toY(v){ return tH - PADt - ((v-tMin)/tSpan)*(tH-PADt-4); }
+
+    // Data dots
+    for (var i=0;i<n;i++) {
+      tc.beginPath(); tc.arc(toX(i), toY(rVals[i]), 2.5, 0, Math.PI*2);
+      tc.fillStyle='rgba(0,229,255,0.65)'; tc.fill();
+    }
+    // Regression line
+    tc.beginPath();
+    tc.moveTo(toX(0),   toY(intercept));
+    tc.lineTo(toX(n-1), toY(intercept+slope*(n-1)));
+    tc.strokeStyle='#00e5ff'; tc.lineWidth=2; tc.stroke();
+    // Forecast
+    tc.beginPath(); tc.setLineDash([5,4]);
+    tc.moveTo(toX(n-1), toY(intercept+slope*(n-1)));
+    tc.lineTo(toX(n-1+FSTEPS), toY(intercept+slope*(n-1+FSTEPS)));
+    tc.strokeStyle='#ffb700'; tc.lineWidth=1.5; tc.stroke();
+    tc.setLineDash([]);
+    // "now" marker
+    tc.beginPath(); tc.strokeStyle='rgba(255,183,0,0.25)'; tc.lineWidth=1;
+    tc.setLineDash([2,3]);
+    tc.moveTo(toX(n-1),0); tc.lineTo(toX(n-1),tH); tc.stroke(); tc.setLineDash([]);
+    tc.fillStyle='rgba(255,183,0,0.5)'; tc.font='8px DM Mono';
+    tc.fillText('jetzt', toX(n-1)+3, 10);
+
+    // Update stats
+    var slopeEl = document.getElementById('trendSlope');
+    slopeEl.textContent = (slope*10>=0?'+':'')+(slope*10).toFixed(3);
+    slopeEl.className   = 'stat-val ' + (slope>0.005?'up':slope<-0.005?'down':'');
+    document.getElementById('trendR2').textContent = r2.toFixed(3);
+    var fcast = intercept + slope*(n-1+FSTEPS);
+    document.getElementById('trendForecast').textContent = fcast.toFixed(2);
+    var dirEl = document.getElementById('trendDir');
+    dirEl.textContent = slope>0.005 ? '\u2191 Steigend' : slope<-0.005 ? '\u2193 Fallend' : '\u2192 Stabil';
+    dirEl.className   = 'stat-val ' + (slope>0.005?'up':slope<-0.005?'down':'');
+  }
+
+  // ── METRICS ────────────────────────────────────────────────────
+  if (samples.length > 0) {
+    var last = samples[samples.length-1];
+    document.getElementById('valX').textContent = last.x.toFixed(2);
+    document.getElementById('valY').textContent = last.y.toFixed(2);
+    document.getElementById('valZ').textContent = last.z.toFixed(2);
+    document.getElementById('sampleRate').textContent = displayHz + ' Hz';
+
+    if (bufZ_score.length > 0)
+      document.getElementById('zScoreDisplay').textContent =
+        bufZ_score[bufZ_score.length-1].toFixed(2);
+
+    var sw = samples.slice(-ANOM_WIN).map(function(s){ return s.mag; });
+    if (sw.length >= 10) {
+      var smu  = sw.reduce(function(a,b){ return a+b; },0) / sw.length;
+      var ssig = Math.sqrt(sw.reduce(function(a,b){ return a+(b-smu)*(b-smu); },0) / sw.length);
+      document.getElementById('meanVal').textContent = smu.toFixed(2);
+      document.getElementById('stdVal').textContent  = ssig.toFixed(2);
+    }
+  }
+}
+
+requestAnimationFrame(render);
+</script>
+</body>
+</html>
