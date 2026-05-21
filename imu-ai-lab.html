@@ -24,6 +24,10 @@
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
+  html, body {
+    touch-action: pan-x pan-y; /* allow scroll, block pinch-zoom */
+  }
+
   body {
     background: var(--bg);
     color: var(--text);
@@ -1007,10 +1011,17 @@ function render(ts) {
 
 requestAnimationFrame(render);
 
-// Prevent iOS Safari from zooming on canvas tap (ignores user-scalable=no since iOS 10)
-document.querySelectorAll('canvas').forEach(function(c) {
-  c.addEventListener('touchstart', function(e) { e.preventDefault(); }, { passive: false });
-});
+// Block pinch-zoom: gesturestart is an iOS-only event that fires before scaling begins
+document.addEventListener('gesturestart',  function(e) { e.preventDefault(); }, { passive: false });
+document.addEventListener('gesturechange', function(e) { e.preventDefault(); }, { passive: false });
+
+// Block double-tap zoom (iOS ignores user-scalable=no since iOS 10)
+var _lastTap = 0;
+document.addEventListener('touchend', function(e) {
+  var now = Date.now();
+  if (now - _lastTap < 300) e.preventDefault();
+  _lastTap = now;
+}, { passive: false });
 </script>
 </body>
 </html>
