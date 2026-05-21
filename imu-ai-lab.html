@@ -158,6 +158,7 @@
     width: 100%;
     display: block;
     border-radius: 4px;
+    touch-action: none;  /* prevent double-tap zoom on iOS/Android */
   }
 
   /* METRIC CARDS */
@@ -1005,6 +1006,11 @@ function render(ts) {
 }
 
 requestAnimationFrame(render);
+
+// Prevent iOS Safari from zooming on canvas tap (ignores user-scalable=no since iOS 10)
+document.querySelectorAll('canvas').forEach(function(c) {
+  c.addEventListener('touchstart', function(e) { e.preventDefault(); }, { passive: false });
+});
 </script>
 </body>
 </html>
