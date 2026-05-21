@@ -329,6 +329,40 @@
     margin-bottom: 10px;
     margin-top: 4px;
   }
+
+  /* SENSITIVITY SLIDER */
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+  }
+  .slider-row label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+  .slider-row input[type=range] {
+    flex: 1;
+    accent-color: var(--accent2);
+    cursor: pointer;
+  }
+  .slider-val {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent2);
+    font-weight: 500;
+    flex-shrink: 0;
+    width: 32px;
+    text-align: right;
+  }
 </style>
 </head>
 <body>
@@ -403,6 +437,13 @@
 <div class="panel" id="panel-1">
   <div class="section-title">Anomalie-Erkennung · Z-Score Methode</div>
 
+  <div class="slider-row">
+    <label>Sensitivity</label>
+    <input type="range" id="threshSlider" min="1" max="5" step="0.1" value="2.5"
+      oninput="ANOM_THRESH = +this.value; var v=(+this.value).toFixed(1); document.getElementById('threshVal').textContent = v+'σ'; document.getElementById('threshInfo').textContent = v; document.getElementById('threshChartLabel').textContent = v;">
+    <span class="slider-val" id="threshVal">2.5σ</span>
+  </div>
+
   <div class="anomaly-indicator" id="anomalyBox">
     <div class="anomaly-icon" id="anomalyIcon">✅</div>
     <div class="anomaly-text">
@@ -418,7 +459,7 @@
   <div class="chart-wrap">
     <div class="chart-label">
       <span>Z-SCORE VERLAUF</span>
-      <span style="color:var(--accent2)">— Schwelle: 2.5σ</span>
+      <span style="color:var(--accent2)">— Schwelle: <span id="threshChartLabel">2.5</span>σ</span>
     </div>
     <canvas id="zCanvas" height="120"></canvas>
   </div>
@@ -440,7 +481,7 @@
 
   <div class="algo-info">
     <strong>Algorithmus:</strong> Rollender Z-Score über 100-Sample-Fenster.<br>
-    Z = (x − μ) / σ &nbsp;·&nbsp; Schwelle: |Z| &gt; 2.5<br>
+    Z = (x − μ) / σ &nbsp;·&nbsp; Schwelle: |Z| &gt; <span id="threshInfo">2.5</span><br>
     Baseline-Adaptation nach 200 Samples.
   </div>
 
@@ -492,7 +533,7 @@
 // ─── STATE ────────────────────────────────────────────────────────────
 const VIEW_SECS   = 5;     // sichtbares Zeitfenster in Sekunden
 const ANOM_WIN    = 100;   // Fenster für Z-Score (samples)
-const ANOM_THRESH = 2.5;
+let ANOM_THRESH = 2.5;
 const MAX_SAMPLES = 2000;  // absoluter Ringpuffer-Deckel
 
 // Zeitgestempelter Ringpuffer: jedes Element { t, x, y, z, mag }
@@ -514,6 +555,8 @@ let demoT    = 0;
 function switchTab(i) {
   document.querySelectorAll('.tab-btn').forEach((b,j) => b.classList.toggle('active', i===j));
   document.querySelectorAll('.panel').forEach((p,j) => p.classList.toggle('active', i===j));
+  // Re-measure canvases now that the newly active panel is visible
+  requestAnimationFrame(initAllCanvases);
 }
 
 // ─── SENSOR START/STOP ────────────────────────────────────────────────
@@ -668,10 +711,10 @@ function addLog(msg, type) {
 const canvasCache = new Map();
 
 function initCanvas(c) {
-  const dpr = window.devicePixelRatio || 1;
-  const r   = c.getBoundingClientRect();
-  const W   = r.width;
+  const W = c.offsetWidth;
+  if (W <= 0) return; // skip hidden panels
   const H   = parseFloat(c.getAttribute('height'));
+  const dpr = window.devicePixelRatio || 1;
   c.width   = W * dpr;
   c.height  = H * dpr;
   const ctx = c.getContext('2d');
@@ -681,12 +724,15 @@ function initCanvas(c) {
 }
 
 function resizeCanvas(c) {
-  const dpr = window.devicePixelRatio || 1;
-  const r   = c.getBoundingClientRect();
-  const W   = r.width;
-  const H   = parseFloat(c.getAttribute('height'));
   const hit = canvasCache.get(c.id);
-  if (hit && Math.abs(hit.W - W) < 1) return [hit.ctx, hit.W, hit.H];
+  // Use offsetWidth (integer, layout-stable) to avoid sub-pixel jitter
+  const W = c.offsetWidth;
+  // Skip if hidden (inside display:none panel) or not yet laid out
+  if (W <= 0) return hit ? [hit.ctx, hit.W, hit.H] : [c.getContext('2d'), 1, parseFloat(c.getAttribute('height'))];
+  const H = parseFloat(c.getAttribute('height'));
+  // 4px hysteresis prevents resize thrashing from mobile viewport changes during scroll
+  if (hit && Math.abs(hit.W - W) < 4) return [hit.ctx, hit.W, hit.H];
+  const dpr = window.devicePixelRatio || 1;
   c.width   = W * dpr;
   c.height  = H * dpr;
   const ctx = c.getContext('2d');
@@ -701,7 +747,13 @@ function initAllCanvases() {
     if (c) initCanvas(c);
   });
 }
-window.addEventListener('resize', initAllCanvases);
+
+// Debounce resize to ignore rapid viewport changes (mobile scroll chrome show/hide)
+let _resizeTimer;
+window.addEventListener('resize', function() {
+  clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(initAllCanvases, 150);
+});
 setTimeout(initAllCanvases, 120);
 
 // ─── DRAW HELPERS ─────────────────────────────────────────────────────
@@ -849,7 +901,7 @@ function render(ts) {
   zc.beginPath(); zc.strokeStyle='rgba(255,79,123,0.55)'; zc.lineWidth=1;
   zc.setLineDash([4,3]); zc.moveTo(0,ty); zc.lineTo(zW,ty); zc.stroke(); zc.setLineDash([]);
   zc.fillStyle='rgba(255,79,123,0.6)'; zc.font='8px DM Mono';
-  zc.fillText('2.5\u03c3', 4, ty-3);
+  zc.fillText(ANOM_THRESH.toFixed(1)+'\u03c3', 4, ty-3);
 
   if (win.length > 1 && zWin.length === win.length) {
     zc.beginPath();
