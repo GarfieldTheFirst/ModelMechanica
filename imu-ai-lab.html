@@ -162,7 +162,7 @@
     width: 100%;
     display: block;
     border-radius: 4px;
-    touch-action: none;  /* prevent double-tap zoom on iOS/Android */
+    touch-action: pan-y; /* allow scroll, block pinch-zoom on canvas */
   }
 
   /* METRIC CARDS */
@@ -556,6 +556,11 @@ let running  = false;
 let demoMode = false;
 let demoT    = 0;
 
+// Smooth y-axis bounds — lerp toward data-driven targets each frame
+// so the scale adapts gradually instead of snapping every render tick
+var sb = { rawMin: -15, rawMax: 15, magMin: 0, magMax: 20, zMax: 4 };
+const LERP = 0.06; // ~2 s to fully converge at 30 fps
+
 // ─── TAB SWITCHING ────────────────────────────────────────────────────
 function switchTab(i) {
   document.querySelectorAll('.tab-btn').forEach((b,j) => b.classList.toggle('active', i===j));
@@ -830,8 +835,9 @@ function render(ts) {
   if (win.length > 1) {
     var allV = [];
     for (var i=0;i<win.length;i++) { allV.push(win[i].x,win[i].y,win[i].z); }
-    var vMin = Math.min.apply(null,allV) - 0.5;
-    var vMax = Math.max.apply(null,allV) + 0.5;
+    sb.rawMin += (Math.min.apply(null,allV) - 0.5 - sb.rawMin) * LERP;
+    sb.rawMax += (Math.max.apply(null,allV) + 0.5 - sb.rawMax) * LERP;
+    var vMin = sb.rawMin, vMax = sb.rawMax;
     var span = vMax - vMin || 1;
     var PAD  = 12;
 
@@ -861,8 +867,9 @@ function render(ts) {
 
   if (win.length > 1) {
     var mags = win.map(function(s){ return s.mag; });
-    var mMin = Math.max(0, Math.min.apply(null,mags) - 0.5);
-    var mMax = Math.max.apply(null,mags) + 0.5;
+    sb.magMin += (Math.max(0, Math.min.apply(null,mags) - 0.5) - sb.magMin) * LERP;
+    sb.magMax += (Math.max.apply(null,mags) + 0.5 - sb.magMax) * LERP;
+    var mMin = sb.magMin, mMax = sb.magMax;
     var mSpan = mMax - mMin || 1;
     var PADm  = 12;
     // filled area
@@ -898,8 +905,10 @@ function render(ts) {
   drawGrid(zc, zW, zH, 4);
 
   var zWin = getZWindow();
-  var zMax = 4;
-  for (var i=0;i<zWin.length;i++) if (zWin[i]>zMax) zMax=zWin[i];
+  var zTarget = 4;
+  for (var i=0;i<zWin.length;i++) if (zWin[i]>zTarget) zTarget=zWin[i];
+  sb.zMax += (zTarget - sb.zMax) * LERP;
+  var zMax = sb.zMax;
   var PADz = 12;
 
   var ty = zH - PADz - (ANOM_THRESH / zMax) * (zH - PADz - 4);
