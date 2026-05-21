@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ModelMechanica</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Space+Grotesk:wght@300;400;600;700&display=swap');
+
+  :root {
+    --bg: #0a0c10;
+    --surface: #111318;
+    --surface2: #181c23;
+    --border: #232830;
+    --accent: #00e5ff;
+    --accent2: #ff4f7b;
+    --accent3: #7cfc6e;
+    --warn: #ffb700;
+    --text: #e8eaf0;
+    --muted: #5a6070;
+    --mono: 'DM Mono', monospace;
+    --sans: 'Space Grotesk', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* HEADER */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 40px 48px 36px;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  .site-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  h1 {
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+    color: var(--text);
+    margin-bottom: 16px;
+  }
+  h1 span { color: var(--accent); }
+  .site-desc {
+    font-size: 15px;
+    color: var(--muted);
+    max-width: 520px;
+    line-height: 1.6;
+    font-weight: 300;
+  }
+
+  /* MAIN */
+  main {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 48px 80px;
+  }
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* PROJECT GRID */
+  .projects {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+
+  .project-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .project-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .project-card:hover {
+    border-color: rgba(0, 229, 255, 0.3);
+    background: var(--surface2);
+  }
+  .project-card:hover::before { opacity: 1; }
+
+  .project-icon {
+    font-size: 28px;
+    line-height: 1;
+  }
+  .project-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+  .project-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.55;
+    flex: 1;
+  }
+  .project-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .tag {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: rgba(0, 229, 255, 0.07);
+    color: var(--accent);
+    border: 1px solid rgba(0, 229, 255, 0.15);
+    text-transform: uppercase;
+  }
+  .tag.green {
+    background: rgba(124, 252, 110, 0.07);
+    color: var(--accent3);
+    border-color: rgba(124, 252, 110, 0.15);
+  }
+  .tag.red {
+    background: rgba(255, 79, 123, 0.07);
+    color: var(--accent2);
+    border-color: rgba(255, 79, 123, 0.15);
+  }
+  .project-arrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    margin-top: auto;
+    align-self: flex-end;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .project-card:hover .project-arrow { opacity: 1; }
+
+  /* FOOTER */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 24px 48px;
+    max-width: 960px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .footer-text {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+
+  @media (max-width: 600px) {
+    header, main, footer { padding-left: 20px; padding-right: 20px; }
+    header { padding-top: 28px; padding-bottom: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="site-tag">ModelMechanica</div>
+  <h1>Engineering<br><span>Projects</span></h1>
+  <p class="site-desc">
+    Interactive browser-based tools for signal processing, machine learning,
+    and sensor data analysis. No installation required.
+  </p>
+</header>
+
+<main>
+  <div class="section-label">Projects</div>
+
+  <div class="projects">
+
+    <a class="project-card" href="imu-ai-lab.html">
+      <div class="project-icon">📡</div>
+      <div>
+        <div class="project-name">Mobile AI Lab</div>
+        <div class="project-desc">
+          Real-time IMU signal processing in the browser. Live accelerometer
+          data, Z-score anomaly detection, and energy trend forecasting via
+          linear regression.
+        </div>
+      </div>
+      <div class="project-tags">
+        <span class="tag">IMU</span>
+        <span class="tag green">Live Sensor</span>
+        <span class="tag red">Anomaly Detection</span>
+      </div>
+      <div class="project-arrow">→ open</div>
+    </a>
+
+  </div>
+</main>
+
+<footer>
+  <span class="footer-text">ModelMechanica — Engineering in the Browser</span>
+  <a class="footer-text" href="https://github.com/GarfieldTheFirst/ModelMechanica" style="color:var(--muted);text-decoration:none;">GitHub</a>
+</footer>
+
+</body>
+</html>
