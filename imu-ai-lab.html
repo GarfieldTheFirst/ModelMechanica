@@ -371,9 +371,69 @@
     color: var(--accent2);
     font-weight: 500;
     flex-shrink: 0;
-    width: 32px;
+    width: 48px;
     text-align: right;
   }
+
+  /* HINTS */
+  .hints {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .hints-toggle {
+    width: 100%;
+    background: var(--surface2);
+    border: none;
+    padding: 9px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .hints-toggle .arrow { transition: transform 0.2s; }
+  .hints-toggle.open .arrow { transform: rotate(180deg); }
+  .hints-body {
+    background: var(--surface);
+    padding: 0 14px;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease, padding 0.25s;
+  }
+  .hints-body.open { max-height: 600px; padding: 10px 14px; }
+  .hint-section { margin-bottom: 10px; }
+  .hint-section:last-child { margin-bottom: 0; }
+  .hint-section-title {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 5px;
+  }
+  .hint-row {
+    display: flex;
+    gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    align-items: baseline;
+  }
+  .hint-row:last-child { border: none; padding-bottom: 0; }
+  .hint-range {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--warn);
+    flex-shrink: 0;
+    width: 52px;
+  }
+  .hint-text { font-size: 10px; color: var(--muted); line-height: 1.55; }
+  .hint-text strong { color: var(--text); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -449,10 +509,56 @@
   <div class="section-title">Anomalie-Erkennung · Z-Score Methode</div>
 
   <div class="slider-row">
-    <label>Sensitivity</label>
-    <input type="range" id="threshSlider" min="1" max="5" step="0.1" value="2.5"
+    <label>Threshold</label>
+    <input type="range" id="threshSlider" min="1" max="5" step="0.1" value="3.0"
       oninput="ANOM_THRESH = +this.value; var v=(+this.value).toFixed(1); document.getElementById('threshVal').textContent = v+'σ'; document.getElementById('threshInfo').textContent = v; document.getElementById('threshChartLabel').textContent = v;">
-    <span class="slider-val" id="threshVal">2.5σ</span>
+    <span class="slider-val" id="threshVal">3.0σ</span>
+  </div>
+
+  <div class="slider-row">
+    <label>Window</label>
+    <input type="range" id="windowSlider" min="20" max="500" step="10" value="100"
+      oninput="ANOM_WIN = +this.value; var w=+this.value; document.getElementById('windowVal').textContent = w+'smp'; document.getElementById('windowInfo').textContent = w; document.getElementById('windowSecs').textContent = (w/50).toFixed(1);">
+    <span class="slider-val" id="windowVal">100smp</span>
+  </div>
+
+  <div class="hints">
+    <button class="hints-toggle" onclick="var b=document.getElementById('hintsBody'); b.classList.toggle('open'); this.classList.toggle('open');">
+      <span>Parameter guide</span>
+      <span class="arrow">▾</span>
+    </button>
+    <div class="hints-body" id="hintsBody">
+      <div class="hint-section">
+        <div class="hint-section-title">Threshold (σ) — how far from normal triggers an alert</div>
+        <div class="hint-row">
+          <span class="hint-range">1 – 2σ</span>
+          <span class="hint-text"><strong>Sensitive.</strong> Flags ~5–30 % of samples under Gaussian noise. Use when subtle deviations matter: gait analysis, early-warning vibration shifts, activity recognition.</span>
+        </div>
+        <div class="hint-row">
+          <span class="hint-range">2 – 3σ</span>
+          <span class="hint-text"><strong>Balanced.</strong> ~0.3–5 % false-positive rate. Good general purpose starting point for most monitoring tasks.</span>
+        </div>
+        <div class="hint-row">
+          <span class="hint-range">3 – 5σ</span>
+          <span class="hint-text"><strong>Conservative.</strong> Only extreme outliers (&lt;0.3 % of normal samples). Use for safety-critical alerts: impact detection, mechanical fault alarms, structural damage.</span>
+        </div>
+      </div>
+      <div class="hint-section">
+        <div class="hint-section-title">Window (samples) — baseline memory at ~50 Hz</div>
+        <div class="hint-row">
+          <span class="hint-range">20 – 50</span>
+          <span class="hint-text"><strong>~0.4–1 s.</strong> Very responsive baseline. Catches sharp transient events but adapts quickly — normal activity after a spike resets baseline fast. Use for: taps, drops, impacts.</span>
+        </div>
+        <div class="hint-row">
+          <span class="hint-range">50 – 200</span>
+          <span class="hint-text"><strong>~1–4 s.</strong> Balanced. Baseline stable enough to distinguish activity changes (walking vs. running) without being fooled by brief spikes.</span>
+        </div>
+        <div class="hint-row">
+          <span class="hint-range">200 – 500</span>
+          <span class="hint-text"><strong>~4–10 s.</strong> Very stable baseline. Best for slow state changes: machine idle vs. loaded, structural resonance shifts, long-term vibration drift. Slow to adapt after a regime change.</span>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="anomaly-indicator" id="anomalyBox">
@@ -470,7 +576,7 @@
   <div class="chart-wrap">
     <div class="chart-label">
       <span>Z-SCORE VERLAUF</span>
-      <span style="color:var(--accent2)">— Schwelle: <span id="threshChartLabel">2.5</span>σ</span>
+      <span style="color:var(--accent2)">— Threshold: <span id="threshChartLabel">3.0</span>σ</span>
     </div>
     <canvas id="zCanvas" height="120"></canvas>
   </div>
@@ -491,9 +597,8 @@
   </div>
 
   <div class="algo-info">
-    <strong>Algorithmus:</strong> Rollender Z-Score über 100-Sample-Fenster.<br>
-    Z = (x − μ) / σ &nbsp;·&nbsp; Schwelle: |Z| &gt; <span id="threshInfo">2.5</span><br>
-    Baseline-Adaptation nach 200 Samples.
+    <strong>Algorithm:</strong> Rolling Z-score over <span id="windowInfo">100</span>-sample window (~<span id="windowSecs">2.0</span> s at 50 Hz).<br>
+    Z = (x − μ) / σ &nbsp;·&nbsp; Threshold: |Z| &gt; <span id="threshInfo">3.0</span>σ
   </div>
 
   <div class="event-log">
@@ -543,8 +648,8 @@
 <script>
 // ─── STATE ────────────────────────────────────────────────────────────
 const VIEW_SECS   = 5;     // sichtbares Zeitfenster in Sekunden
-const ANOM_WIN    = 100;   // Fenster für Z-Score (samples)
-let ANOM_THRESH = 2.5;
+let ANOM_WIN    = 100;   // rolling window for Z-score (samples), user-adjustable
+let ANOM_THRESH = 3.0;
 const MAX_SAMPLES = 2000;  // absoluter Ringpuffer-Deckel
 
 // Zeitgestempelter Ringpuffer: jedes Element { t, x, y, z, mag }
