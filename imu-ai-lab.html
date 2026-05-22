@@ -162,8 +162,14 @@
     width: 100%;
     display: block;
     border-radius: 4px;
-    touch-action: pan-y; /* allow scroll, block pinch-zoom on canvas */
+    touch-action: pan-y;
   }
+  /* Explicit heights break the layout-cascade: changing c.width no longer
+     forces the browser to recalculate canvas display height via aspect-ratio */
+  #rawCanvas    { height: 140px; }
+  #magCanvas    { height: 90px;  }
+  #zCanvas      { height: 120px; }
+  #trendCanvas  { height: 160px; }
 
   /* METRIC CARDS */
   .metrics {
@@ -558,10 +564,10 @@ let demoT    = 0;
 
 // Smooth y-axis bounds — lerp toward data-driven targets each frame
 // so the scale adapts gradually instead of snapping every render tick
-var sb = { rawMin: -15, rawMax: 15, magMin: 0, magMax: 20, zMax: 4 };
-// Asymmetric lerp: snap outward instantly (no clipping), shrink inward very slowly (no visible zoom-in)
-const LERP_OUT = 1.0;
-const LERP_IN  = 0.01; // ~3 s to tighten at 30 fps
+// null = not yet initialised; first sample snaps immediately, then asymmetric lerp applies
+var sb = { rawMin: null, rawMax: null, magMin: null, magMax: null, zMax: null };
+const LERP_OUT = 1.0;   // snap outward instantly — never clip signal
+const LERP_IN  = 0.008; // creep inward ~4 s at 30 fps — invisible tightening
 
 // ─── TAB SWITCHING ────────────────────────────────────────────────────
 function switchTab(i) {
@@ -760,11 +766,16 @@ function initAllCanvases() {
   });
 }
 
-// Debounce resize to ignore rapid viewport changes (mobile scroll chrome show/hide)
-let _resizeTimer;
+// Only resize canvases when the viewport WIDTH changes (screen rotation / desktop resize).
+// iOS scroll shows/hides the address bar — that only changes innerHeight, never innerWidth —
+// so those events are completely ignored here.
+let _resizeTimer, _lastInnerW = window.innerWidth;
 window.addEventListener('resize', function() {
+  var w = window.innerWidth;
+  if (Math.abs(w - _lastInnerW) < 4) return;
+  _lastInnerW = w;
   clearTimeout(_resizeTimer);
-  _resizeTimer = setTimeout(initAllCanvases, 150);
+  _resizeTimer = setTimeout(initAllCanvases, 200);
 });
 setTimeout(initAllCanvases, 120);
 
@@ -839,8 +850,11 @@ function render(ts) {
     for (var i=0;i<win.length;i++) { allV.push(win[i].x,win[i].y,win[i].z); }
     var tRawMin = Math.min.apply(null,allV) - 0.5;
     var tRawMax = Math.max.apply(null,allV) + 0.5;
-    sb.rawMin += (tRawMin - sb.rawMin) * (tRawMin < sb.rawMin ? LERP_OUT : LERP_IN);
-    sb.rawMax += (tRawMax - sb.rawMax) * (tRawMax > sb.rawMax ? LERP_OUT : LERP_IN);
+    if (sb.rawMin === null) { sb.rawMin = tRawMin; sb.rawMax = tRawMax; }
+    else {
+      sb.rawMin += (tRawMin - sb.rawMin) * (tRawMin < sb.rawMin ? LERP_OUT : LERP_IN);
+      sb.rawMax += (tRawMax - sb.rawMax) * (tRawMax > sb.rawMax ? LERP_OUT : LERP_IN);
+    }
     var vMin = sb.rawMin, vMax = sb.rawMax;
     var span = vMax - vMin || 1;
     var PAD  = 12;
@@ -873,8 +887,11 @@ function render(ts) {
     var mags = win.map(function(s){ return s.mag; });
     var tMagMin = Math.max(0, Math.min.apply(null,mags) - 0.5);
     var tMagMax = Math.max.apply(null,mags) + 0.5;
-    sb.magMin += (tMagMin - sb.magMin) * (tMagMin < sb.magMin ? LERP_OUT : LERP_IN);
-    sb.magMax += (tMagMax - sb.magMax) * (tMagMax > sb.magMax ? LERP_OUT : LERP_IN);
+    if (sb.magMin === null) { sb.magMin = tMagMin; sb.magMax = tMagMax; }
+    else {
+      sb.magMin += (tMagMin - sb.magMin) * (tMagMin < sb.magMin ? LERP_OUT : LERP_IN);
+      sb.magMax += (tMagMax - sb.magMax) * (tMagMax > sb.magMax ? LERP_OUT : LERP_IN);
+    }
     var mMin = sb.magMin, mMax = sb.magMax;
     var mSpan = mMax - mMin || 1;
     var PADm  = 12;
@@ -913,7 +930,8 @@ function render(ts) {
   var zWin = getZWindow();
   var zTarget = 4;
   for (var i=0;i<zWin.length;i++) if (zWin[i]>zTarget) zTarget=zWin[i];
-  sb.zMax += (zTarget - sb.zMax) * (zTarget > sb.zMax ? LERP_OUT : LERP_IN);
+  if (sb.zMax === null) { sb.zMax = zTarget; }
+  else { sb.zMax += (zTarget - sb.zMax) * (zTarget > sb.zMax ? LERP_OUT : LERP_IN); }
   var zMax = sb.zMax;
   var PADz = 12;
 
