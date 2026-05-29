@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Mobile AI Lab</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Space+Grotesk:wght@300;400;600;700&display=swap');
 
@@ -82,7 +84,7 @@
   /* TABS */
   .tabs {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: repeat(4, 1fr);
     border-bottom: 1px solid var(--border);
     background: var(--bg);
     position: sticky;
@@ -434,6 +436,86 @@
   }
   .hint-text { font-size: 10px; color: var(--muted); line-height: 1.55; }
   .hint-text strong { color: var(--text); font-weight: 600; }
+
+  /* MAP TAB */
+  #mapContainer {
+    width: 100%;
+    height: calc(100dvh - 260px);
+    min-height: 280px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+  /* Override Leaflet popup to match dark theme */
+  .leaflet-popup-content-wrapper {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    box-shadow: none;
+  }
+  .leaflet-popup-tip { background: var(--surface2); }
+  .map-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .map-btn {
+    padding: 10px 18px;
+    background: linear-gradient(135deg, var(--accent) 0%, #0099bb 100%);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    flex-shrink: 0;
+  }
+  .map-btn:active { opacity: 0.8; }
+  .map-btn.stop { background: linear-gradient(135deg, var(--accent2) 0%, #cc2255 100%); }
+  .map-btn.secondary {
+    background: var(--surface2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .gps-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .gps-stats span { display: block; }
+  #gpsStatus { color: var(--accent3); }
+  .map-legend {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
 </style>
 </head>
 <body>
@@ -455,6 +537,9 @@
   </button>
   <button class="tab-btn" onclick="switchTab(2)">
     <span class="tab-icon">📈</span>Trend
+  </button>
+  <button class="tab-btn" onclick="switchTab(3)">
+    <span class="tab-icon">🗺️</span>Map
   </button>
 </div>
 
@@ -645,6 +730,34 @@
   </div>
 </div>
 
+<!-- TAB 3: MAP -->
+<div class="panel" id="panel-3">
+  <div class="section-title">GPS · Signal Intensity Map</div>
+
+  <div class="map-controls">
+    <button class="map-btn" id="gpsBtn" onclick="toggleGPS()">▶ Start GPS</button>
+    <button class="map-btn secondary" onclick="clearTracks()">✕ Clear</button>
+    <div class="gps-stats">
+      <span id="gpsStatus">GPS inactive</span>
+      <span id="gpsAccuracy">Accuracy: —</span>
+      <span id="gpsPoints">0 points recorded</span>
+    </div>
+  </div>
+
+  <div id="mapContainer"></div>
+
+  <div class="map-legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#7cfc6e"></div>Normal (&lt; 1.5σ)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ffb700"></div>Elevated (1.5 – 3σ)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ff4f7b"></div>Anomaly (&gt; 3σ)</div>
+  </div>
+
+  <div class="algo-info">
+    <strong>Method:</strong> GPS sampled at ~1 Hz via Geolocation API. Each fix is colored by the max Z-score recorded since the previous fix — green = normal, yellow = elevated, red = anomaly threshold exceeded.<br>
+    Tap any point on the map for details. IMU must be running to record signal data.
+  </div>
+</div>
+
 <script>
 // ─── STATE ────────────────────────────────────────────────────────────
 const VIEW_SECS   = 5;     // sichtbares Zeitfenster in Sekunden
@@ -667,6 +780,17 @@ let running  = false;
 let demoMode = false;
 let demoT    = 0;
 
+// ─── GPS STATE ────────────────────────────────────────────────────────
+let gpsMap       = null;
+let gpsWatchId   = null;
+let gpsRunning   = false;
+let gpsPath      = [];       // [lat, lng] array for the polyline
+let gpsPolyline  = null;
+let gpsMarkers   = [];
+let gpsPosMarker = null;     // current-position marker
+let gpsPointCount = 0;
+let maxZSinceLastFix = 0;    // max Z-score accumulated between GPS fixes
+
 // Smooth y-axis bounds — lerp toward data-driven targets each frame
 // so the scale adapts gradually instead of snapping every render tick
 // null = not yet initialised; first sample snaps immediately, then asymmetric lerp applies
@@ -678,8 +802,12 @@ const LERP_IN  = 0.008; // creep inward ~4 s at 30 fps — invisible tightening
 function switchTab(i) {
   document.querySelectorAll('.tab-btn').forEach((b,j) => b.classList.toggle('active', i===j));
   document.querySelectorAll('.panel').forEach((p,j) => p.classList.toggle('active', i===j));
-  // Re-measure canvases now that the newly active panel is visible
-  requestAnimationFrame(initAllCanvases);
+  requestAnimationFrame(function() {
+    initAllCanvases();
+    // Leaflet needs the container to be visible before it can calculate size
+    if (i === 3 && gpsMap) gpsMap.invalidateSize();
+    if (i === 3 && !gpsMap) initMap();
+  });
 }
 
 // ─── SENSOR START/STOP ────────────────────────────────────────────────
@@ -769,6 +897,8 @@ function pushSample(x, y, z) {
   const zs    = sigma > 0.001 ? Math.abs((mag - mu) / sigma) : 0;
   bufZ_score.push(zs);
   if (bufZ_score.length > MAX_SAMPLES) bufZ_score.shift();
+
+  if (zs > maxZSinceLastFix) maxZSinceLastFix = zs; // for GPS dot coloring
 
   if (zs > ANOM_THRESH && samples.length > ANOM_WIN) {
     anomalyCount++;
@@ -1149,7 +1279,127 @@ function render(ts) {
 
 requestAnimationFrame(render);
 
-// Block pinch-zoom: gesturestart is an iOS-only event that fires before scaling begins
+// ─── GPS / MAP ────────────────────────────────────────────────────────
+
+function initMap() {
+  if (gpsMap) return;
+  gpsMap = L.map('mapContainer', { zoomControl: true, attributionControl: true });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
+    maxZoom: 20
+  }).addTo(gpsMap);
+  gpsMap.setView([48.5, 9.0], 5); // default view — Europe
+}
+
+function zScoreColor(z) {
+  if (z >= ANOM_THRESH) return '#ff4f7b';
+  if (z >= 1.5)         return '#ffb700';
+  return '#7cfc6e';
+}
+
+function toggleGPS() {
+  if (gpsRunning) stopGPS(); else startGPS();
+}
+
+function startGPS() {
+  if (!navigator.geolocation) {
+    document.getElementById('gpsStatus').textContent = 'Geolocation not supported';
+    document.getElementById('gpsStatus').style.color = 'var(--accent2)';
+    return;
+  }
+  if (!gpsMap) initMap();
+  maxZSinceLastFix = 0;
+  gpsWatchId = navigator.geolocation.watchPosition(onGPSFix, onGPSError, {
+    enableHighAccuracy: true,
+    maximumAge: 0,
+    timeout: 15000
+  });
+  gpsRunning = true;
+  document.getElementById('gpsBtn').textContent = '⏹ Stop GPS';
+  document.getElementById('gpsBtn').classList.add('stop');
+  document.getElementById('gpsStatus').textContent = 'Acquiring fix…';
+  document.getElementById('gpsStatus').style.color = 'var(--warn)';
+}
+
+function stopGPS() {
+  if (gpsWatchId !== null) navigator.geolocation.clearWatch(gpsWatchId);
+  gpsWatchId = null;
+  gpsRunning = false;
+  document.getElementById('gpsBtn').textContent = '▶ Start GPS';
+  document.getElementById('gpsBtn').classList.remove('stop');
+  document.getElementById('gpsStatus').textContent = 'GPS stopped';
+  document.getElementById('gpsStatus').style.color = 'var(--muted)';
+  if (gpsPosMarker) { gpsMap.removeLayer(gpsPosMarker); gpsPosMarker = null; }
+}
+
+function onGPSFix(pos) {
+  var lat = pos.coords.latitude;
+  var lng = pos.coords.longitude;
+  var acc = pos.coords.accuracy;
+
+  // Status bar
+  document.getElementById('gpsStatus').textContent = 'GPS active';
+  document.getElementById('gpsStatus').style.color = 'var(--accent3)';
+  document.getElementById('gpsAccuracy').textContent = 'Accuracy: ±' + Math.round(acc) + ' m';
+
+  // Current-position pulsing marker (blue dot)
+  var posIcon = L.divIcon({
+    className: '',
+    html: '<div style="width:14px;height:14px;border-radius:50%;background:#00e5ff;border:2px solid #fff;box-shadow:0 0 8px #00e5ff;"></div>',
+    iconSize: [14, 14],
+    iconAnchor: [7, 7]
+  });
+  if (gpsPosMarker) {
+    gpsPosMarker.setLatLng([lat, lng]);
+  } else {
+    gpsPosMarker = L.marker([lat, lng], { icon: posIcon, zIndexOffset: 1000 }).addTo(gpsMap);
+    gpsMap.setView([lat, lng], 17);
+  }
+
+  // Colored history dot for this fix
+  var z     = maxZSinceLastFix;
+  var color = zScoreColor(z);
+  var mag   = samples.length ? samples[samples.length - 1].mag.toFixed(2) : '—';
+  var popup = '<b>Z-max:</b> ' + z.toFixed(2) + 'σ<br><b>|a|:</b> ' + mag + ' m/s²<br><b>Acc:</b> ±' + Math.round(acc) + ' m';
+
+  var dot = L.circleMarker([lat, lng], {
+    radius: 7,
+    fillColor: color,
+    color: '#fff',
+    weight: 1,
+    opacity: 0.9,
+    fillOpacity: 0.85
+  }).bindPopup(popup).addTo(gpsMap);
+  gpsMarkers.push(dot);
+
+  // Path polyline
+  gpsPath.push([lat, lng]);
+  if (gpsPolyline) {
+    gpsPolyline.setLatLngs(gpsPath);
+  } else {
+    gpsPolyline = L.polyline(gpsPath, { color: '#00e5ff', weight: 2, opacity: 0.5 }).addTo(gpsMap);
+  }
+
+  gpsPointCount++;
+  document.getElementById('gpsPoints').textContent = gpsPointCount + ' point' + (gpsPointCount !== 1 ? 's' : '') + ' recorded';
+  maxZSinceLastFix = 0; // reset accumulator for next fix
+}
+
+function onGPSError(err) {
+  document.getElementById('gpsStatus').textContent = 'GPS error: ' + err.message;
+  document.getElementById('gpsStatus').style.color = 'var(--accent2)';
+}
+
+function clearTracks() {
+  gpsMarkers.forEach(function(m) { gpsMap.removeLayer(m); });
+  gpsMarkers = [];
+  if (gpsPolyline) { gpsMap.removeLayer(gpsPolyline); gpsPolyline = null; }
+  gpsPath = [];
+  gpsPointCount = 0;
+  document.getElementById('gpsPoints').textContent = '0 points recorded';
+}
+
+// ─── Block pinch-zoom: gesturestart is an iOS-only event that fires before scaling begins
 document.addEventListener('gesturestart',  function(e) { e.preventDefault(); }, { passive: false });
 document.addEventListener('gesturechange', function(e) { e.preventDefault(); }, { passive: false });
 
