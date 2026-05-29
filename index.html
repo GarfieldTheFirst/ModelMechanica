@@ -207,32 +207,85 @@
 
 <header>
   <div class="site-tag">ModelMechanica</div>
-  <h1>Engineering<br><span>Projects</span></h1>
+  <h1>Mobile<br><span>AI Lab</span></h1>
   <p class="site-desc">
-    Interactive browser-based tools for signal processing, machine learning,
-    and sensor data analysis. No installation required.
+    Browser-based IMU signal analysis — no installation, no account.
+    Pick the monitoring mode that matches your use case.
   </p>
 </header>
 
 <main>
-  <div class="section-label">Projects</div>
+  <div class="section-label">Choose a mode</div>
 
   <div class="projects">
 
-    <a class="project-card" href="imu-ai-lab.html">
+    <a class="project-card" href="imu-ai-lab.html?mode=generic">
       <div class="project-icon">📡</div>
       <div>
-        <div class="project-name">Mobile AI Lab</div>
+        <div class="project-name">Generic Lab</div>
         <div class="project-desc">
-          Real-time IMU signal processing in the browser. Live accelerometer
-          data, Z-score anomaly detection, and energy trend forecasting via
-          linear regression.
+          Full access to all sensors and controls with no preset assumptions.
+          Adjust every parameter manually. Start here to explore or
+          prototype a custom use case.
         </div>
       </div>
       <div class="project-tags">
-        <span class="tag">IMU</span>
-        <span class="tag green">Live Sensor</span>
-        <span class="tag red">Anomaly Detection</span>
+        <span class="tag">3.0σ default</span>
+        <span class="tag green">All tabs</span>
+      </div>
+      <div class="project-arrow">→ open</div>
+    </a>
+
+    <a class="project-card" href="imu-ai-lab.html?mode=road">
+      <div class="project-icon">🚗</div>
+      <div>
+        <div class="project-name">Road Monitor</div>
+        <div class="project-desc">
+          Map road surface quality against GPS while driving. Potholes,
+          joints, and roughness changes appear as colored dots on the route.
+          ISO 8608 reference included.
+        </div>
+      </div>
+      <div class="project-tags">
+        <span class="tag">ISO 8608</span>
+        <span class="tag green">GPS Map</span>
+        <span class="tag">2.5σ · 50 smp</span>
+      </div>
+      <div class="project-arrow">→ open</div>
+    </a>
+
+    <a class="project-card" href="imu-ai-lab.html?mode=running">
+      <div class="project-icon">🏃</div>
+      <div>
+        <div class="project-name">Running Lab</div>
+        <div class="project-desc">
+          Real-time step cadence, footstrike intensity, and fatigue trend.
+          Detects gait irregularities and monitors running economy.
+          Optimal cadence range: 160–180 spm.
+        </div>
+      </div>
+      <div class="project-tags">
+        <span class="tag">Cadence</span>
+        <span class="tag red">Fatigue Trend</span>
+        <span class="tag">2.0σ · 150 smp</span>
+      </div>
+      <div class="project-arrow">→ open</div>
+    </a>
+
+    <a class="project-card" href="imu-ai-lab.html?mode=equipment">
+      <div class="project-icon">⚙️</div>
+      <div>
+        <div class="project-name">Equipment Monitor</div>
+        <div class="project-desc">
+          Track vibration severity on motors, fans, and pumps up to ~3000 RPM.
+          Set a baseline at known-good state, then monitor for drift.
+          ISO 10816 reference included.
+        </div>
+      </div>
+      <div class="project-tags">
+        <span class="tag">ISO 10816</span>
+        <span class="tag red">Vibration</span>
+        <span class="tag">3.5σ · 300 smp</span>
       </div>
       <div class="project-arrow">→ open</div>
     </a>

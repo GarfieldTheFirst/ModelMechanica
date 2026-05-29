@@ -516,6 +516,85 @@
     border-radius: 50%;
     flex-shrink: 0;
   }
+
+  /* MODE BADGE */
+  .mode-badge {
+    display: inline-block;
+    margin-top: 5px;
+    padding: 2px 8px;
+    background: rgba(0,229,255,0.08);
+    border: 1px solid rgba(0,229,255,0.25);
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  /* MODE CONTEXT PANELS */
+  .mode-context {
+    background: var(--surface2);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 6px 6px 0;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .mc-title {
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text);
+    margin-bottom: 7px;
+  }
+  .mode-context p { margin: 0; }
+  .mode-context p + p { margin-top: 5px; }
+
+  /* ISO REFERENCE TABLES */
+  .ref-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 6px;
+    font-family: var(--mono);
+    font-size: 10px;
+  }
+  .ref-table th {
+    text-align: left;
+    color: var(--muted);
+    font-weight: 500;
+    padding: 3px 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .ref-table td {
+    padding: 5px 6px;
+    border-bottom: 1px solid rgba(35,40,48,0.6);
+    color: var(--text);
+    vertical-align: top;
+  }
+  .ref-table tr:last-child td { border-bottom: none; }
+  .ref-note {
+    font-size: 10px;
+    color: var(--muted);
+    font-style: italic;
+    margin-bottom: 5px;
+    line-height: 1.5;
+  }
+  .rg { color: #7cfc6e !important; }
+  .ry { color: #ffb700 !important; }
+  .ro { color: #ff8c42 !important; }
+  .rr { color: #ff4f7b !important; }
+
+  /* CADENCE */
+  .metric-val.good { color: var(--accent3); }
+  #cadenceRow { display: none; margin-bottom: 12px; }
+  #cadenceCard { padding: 14px 12px; text-align: center; }
+  #valCadence  { font-size: 30px; }
 </style>
 </head>
 <body>
@@ -524,6 +603,7 @@
   <div>
     <div class="header-title">Mobile AI Lab</div>
     <div class="header-sub" id="headerSub">IMU · Signal Processing · ML</div>
+    <a class="mode-badge" id="modeBadge" href="index.html">Generic</a>
   </div>
   <div class="status-dot" id="statusDot"></div>
 </div>
@@ -550,6 +630,14 @@
   <div class="permission-note" id="permNote">
     <span>ℹ</span> Auf iOS: Seite via Safari öffnen.<br>
     Sensor-Zugriff erfordert HTTPS &amp; Browser-Erlaubnis.
+  </div>
+
+  <!-- cadence row: visible in running mode only -->
+  <div id="cadenceRow">
+    <div class="metric-card" id="cadenceCard">
+      <div class="metric-val" id="valCadence">—</div>
+      <div class="metric-label">steps / min · cadence</div>
+    </div>
   </div>
 
   <div class="metrics">
@@ -582,10 +670,10 @@
     <canvas id="magCanvas" height="90"></canvas>
   </div>
 
+  <div id="ctx0"></div>
   <div class="algo-info">
-    <strong>Methode:</strong> Direkte IMU-Rohdaten via DeviceMotion API.<br>
-    Sample-Rate: ~50–100 Hz je nach Gerät.<br>
-    Magnitude normalisiert (0g = Ruhezustand).
+    <strong>Method:</strong> Raw IMU data via DeviceMotion API.<br>
+    Sample rate: ~50–100 Hz depending on device.
   </div>
 </div>
 
@@ -686,6 +774,8 @@
     Z = (x − μ) / σ &nbsp;·&nbsp; Threshold: |Z| &gt; <span id="threshInfo">3.0</span>σ
   </div>
 
+  <div id="ctx1"></div>
+
   <div class="event-log">
     <div class="log-title">Event-Log</div>
     <div id="logEntries"></div>
@@ -723,10 +813,10 @@
     </div>
   </div>
 
+  <div id="ctx2"></div>
   <div class="algo-info">
-    <strong>Methode:</strong> RMS-Energie in 1s-Fenstern → Lineare Regression.<br>
-    Prognose: Extrapolation der Regressionsgerade um 10s.<br>
-    R² zeigt Modellgüte (1.0 = perfekte Linearität).
+    <strong>Method:</strong> 1 s RMS energy windows → linear regression + extrapolation.<br>
+    R² = model fit quality (1.0 = perfect linear trend, &lt; 0.5 = noise).
   </div>
 </div>
 
@@ -752,9 +842,10 @@
     <div class="legend-item"><div class="legend-dot" style="background:#ff4f7b"></div>Anomaly (&gt; 3σ)</div>
   </div>
 
+  <div id="ctx3"></div>
   <div class="algo-info">
-    <strong>Method:</strong> GPS sampled at ~1 Hz via Geolocation API. Each fix is colored by the max Z-score recorded since the previous fix — green = normal, yellow = elevated, red = anomaly threshold exceeded.<br>
-    Tap any point on the map for details. IMU must be running to record signal data.
+    <strong>Method:</strong> GPS at ~1 Hz. Each fix colored by max Z-score since previous fix.<br>
+    Tap any point for Z-max, |a|, and GPS accuracy. IMU must be running to record signal data.
   </div>
 </div>
 
@@ -780,6 +871,122 @@ let running  = false;
 let demoMode = false;
 let demoT    = 0;
 
+// ─── MODE SYSTEM ──────────────────────────────────────────────────────
+var currentMode = 'generic';
+
+var MODES = {
+  generic: {
+    label: 'Generic',
+    subtitle: 'IMU · Signal Processing · ML',
+    thresh: 3.0, window: 100, defaultTab: 0, cadence: false,
+    ctx: { 0:'', 1:'', 2:'', 3:'' }
+  },
+  road: {
+    label: 'Road Monitor',
+    subtitle: 'Surface Quality · GPS Mapping · ISO 8608',
+    thresh: 2.5, window: 50, defaultTab: 3, cadence: false,
+    ctx: {
+      0: '<div class="mode-context"><div class="mc-title">Setup</div>' +
+         '<p>Mount phone flat on the dashboard or floor, face-up. Avoid holding it — hand coupling masks road signal.</p>' +
+         '<p>At 60 km/h a pothole every 2 m creates ~8 Hz excitation, well within the 30 Hz Nyquist limit.</p></div>',
+      1: '<div class="mode-context"><div class="mc-title">What triggers an alert</div>' +
+         '<p>Each anomaly event = a road irregularity (pothole, joint, speed bump). Count events per section in the Event Log to compare route segments.</p></div>',
+      2: '<div class="mode-context"><div class="mc-title">Use the Map tab instead</div>' +
+         '<p>For road monitoring, spatial variation matters more than time-based trend. The Map tab shows roughness per GPS fix along your route.</p></div>',
+      3: '<div class="mode-context"><div class="mc-title">ISO 8608 Road Roughness — approx. at 60 km/h</div>' +
+         '<p class="ref-note">Values depend heavily on vehicle suspension — use as relative guide, not absolute measure.</p>' +
+         '<table class="ref-table"><tr><th>Class</th><th>|a| RMS</th><th>Typical condition</th></tr>' +
+         '<tr><td>A</td><td class="rg">&lt; 0.4 m/s²</td><td>Motorway, new surface</td></tr>' +
+         '<tr><td>B</td><td class="ry">0.4 – 1.0</td><td>Good road, minor wear</td></tr>' +
+         '<tr><td>C</td><td class="ro">1.0 – 2.5</td><td>Average, visible deterioration</td></tr>' +
+         '<tr><td>D</td><td class="rr">&gt; 2.5</td><td>Damaged, potholes present</td></tr></table></div>'
+    }
+  },
+  running: {
+    label: 'Running Lab',
+    subtitle: 'Cadence · Impact · Fatigue Trend',
+    thresh: 2.0, window: 150, defaultTab: 0, cadence: true,
+    ctx: {
+      0: '<div class="mode-context"><div class="mc-title">Cadence guide</div>' +
+         '<table class="ref-table"><tr><th>spm</th><th>Assessment</th></tr>' +
+         '<tr><td class="rg">160 – 180</td><td>Optimal — efficient stride</td></tr>' +
+         '<tr><td class="ry">150 – 160</td><td>Low — overstriding risk</td></tr>' +
+         '<tr><td class="rr">&lt; 150</td><td>Too low — high impact loading</td></tr>' +
+         '<tr><td class="ry">&gt; 185</td><td>High — fine for sprinting</td></tr></table>' +
+         '<p style="margin-top:8px">Mount: arm band or shorts pocket, phone vertical.</p></div>',
+      1: '<div class="mode-context"><div class="mc-title">What anomalies mean here</div>' +
+         '<p>An anomaly = hard footstrike variation — asymmetric landing, stumble, or terrain change. Increasing event frequency over 5–10 min can signal fatigue-driven gait breakdown.</p></div>',
+      2: '<div class="mode-context"><div class="mc-title">Fatigue signature</div>' +
+         '<p>A rising RMS trend with R² &gt; 0.7 indicates genuine fatigue, not just pace change. Combined signal: rising trend + increasing anomaly count = high fatigue likelihood.</p>' +
+         '<p style="margin-top:5px">Observe from the first 1–2 minutes onward — early run data sets the baseline for comparison.</p></div>',
+      3: '<div class="mode-context"><div class="mc-title">Trail roughness mapping</div>' +
+         '<p>Useful for trail running — red clusters mark technical or rocky sections. Correlate with your perceived effort.</p></div>'
+    }
+  },
+  equipment: {
+    label: 'Equipment Monitor',
+    subtitle: 'Vibration Severity · ISO 10816 · ≤ 3000 RPM',
+    thresh: 3.5, window: 300, defaultTab: 1, cadence: false,
+    ctx: {
+      0: '<div class="mode-context"><div class="mc-title">Mounting</div>' +
+         '<p>Place phone directly on machine housing — a bolted surface is ideal. Tables or nearby benches attenuate and distort the signal unpredictably.</p>' +
+         '<p style="margin-top:5px">Valid up to ~3000 RPM (50 Hz fundamental). Higher-speed machines require dedicated accelerometers.</p></div>',
+      1: '<div class="mode-context"><div class="mc-title">ISO 10816-3 Vibration Severity</div>' +
+         '<p class="ref-note">Approximate m/s² equivalents assuming dominant frequency ~25 Hz. Relative change from your own baseline is more reliable than absolute thresholds.</p>' +
+         '<table class="ref-table"><tr><th>Zone</th><th>|a| RMS</th><th>Condition / Action</th></tr>' +
+         '<tr><td>A</td><td class="rg">&lt; 0.4</td><td>New / excellent — no action</td></tr>' +
+         '<tr><td>B</td><td class="ry">0.4 – 1.0</td><td>Acceptable for continuous operation</td></tr>' +
+         '<tr><td>C</td><td class="ro">1.0 – 2.5</td><td>Elevated — investigate, increase monitoring</td></tr>' +
+         '<tr><td>D</td><td class="rr">&gt; 2.5</td><td>Unacceptable — stop and inspect</td></tr></table></div>',
+      2: '<div class="mode-context"><div class="mc-title">Trend interpretation</div>' +
+         '<p>A rising RMS trend with R² &gt; 0.7 indicates developing imbalance, wear, or load change. Flat trend = stable operating state.</p>' +
+         '<p style="margin-top:5px">The 2-minute window captures short-term shifts. For long-term wear tracking, record daily RMS snapshots manually.</p></div>',
+      3: '<div class="mode-context"><div class="mc-title">GPS not applicable</div>' +
+         '<p>Equipment monitoring is stationary. Use the Anomaly and Trend tabs instead.</p></div>'
+    }
+  }
+};
+
+function applyMode() {
+  var params = new URLSearchParams(window.location.search);
+  var key = params.get('mode') || 'generic';
+  if (!MODES[key]) key = 'generic';
+  currentMode = key;
+  var m = MODES[key];
+
+  // Settings
+  ANOM_THRESH = m.thresh;
+  ANOM_WIN    = m.window;
+
+  // Sync sliders + labels
+  var tv = m.thresh.toFixed(1);
+  document.getElementById('threshSlider').value        = m.thresh;
+  document.getElementById('threshVal').textContent     = tv + 'σ';
+  document.getElementById('threshInfo').textContent    = tv;
+  document.getElementById('threshChartLabel').textContent = tv;
+
+  document.getElementById('windowSlider').value        = m.window;
+  document.getElementById('windowVal').textContent     = m.window + 'smp';
+  document.getElementById('windowInfo').textContent    = m.window;
+  document.getElementById('windowSecs').textContent    = (m.window / 50).toFixed(1);
+
+  // Header
+  document.getElementById('modeBadge').textContent  = m.label;
+  document.getElementById('headerSub').textContent  = m.subtitle;
+
+  // Context panels
+  [0,1,2,3].forEach(function(i) {
+    var el = document.getElementById('ctx' + i);
+    if (el) el.innerHTML = m.ctx[i] || '';
+  });
+
+  // Cadence row
+  document.getElementById('cadenceRow').style.display = m.cadence ? 'block' : 'none';
+
+  // Default tab (delayed so DOM is ready; Map tab also needs Leaflet init)
+  setTimeout(function() { switchTab(m.defaultTab); }, 50);
+}
+
 // ─── GPS STATE ────────────────────────────────────────────────────────
 let gpsMap       = null;
 let gpsWatchId   = null;
@@ -790,6 +997,12 @@ let gpsMarkers   = [];
 let gpsPosMarker = null;     // current-position marker
 let gpsPointCount = 0;
 let maxZSinceLastFix = 0;    // max Z-score accumulated between GPS fixes
+
+// ─── CADENCE STATE (running mode) ─────────────────────────────────────
+var peakDetBuf  = [];   // last 3 {t, mag} samples for local-max detection
+var peakTimes   = [];   // timestamps of confirmed footstrike peaks
+var lastPeakT   = 0;    // enforce minimum gap between peaks
+var cadenceVal  = 0;    // steps per minute, updated each sample
 
 // Smooth y-axis bounds — lerp toward data-driven targets each frame
 // so the scale adapts gradually instead of snapping every render tick
@@ -898,7 +1111,28 @@ function pushSample(x, y, z) {
   bufZ_score.push(zs);
   if (bufZ_score.length > MAX_SAMPLES) bufZ_score.shift();
 
-  if (zs > maxZSinceLastFix) maxZSinceLastFix = zs; // for GPS dot coloring
+  if (zs > maxZSinceLastFix) maxZSinceLastFix = zs;
+
+  // Cadence peak detection — only active in running mode
+  if (currentMode === 'running') {
+    peakDetBuf.push({ t: t, mag: mag });
+    if (peakDetBuf.length > 3) peakDetBuf.shift();
+    if (peakDetBuf.length === 3) {
+      var prev = peakDetBuf[0], mid = peakDetBuf[1], nxt = peakDetBuf[2];
+      if (mid.mag > prev.mag && mid.mag > nxt.mag && mid.t - lastPeakT > 250) {
+        var pw = samples.slice(-30).map(function(s){ return s.mag; });
+        var pmu = pw.reduce(function(a,b){ return a+b; }, 0) / pw.length;
+        var psig = Math.sqrt(pw.reduce(function(a,b){ return a+(b-pmu)*(b-pmu); }, 0) / pw.length);
+        if (mid.mag > pmu + 0.5 * psig) {
+          peakTimes.push(mid.t);
+          lastPeakT = mid.t;
+        }
+      }
+    }
+    var ptCutoff = t - 8000;
+    while (peakTimes.length && peakTimes[0] < ptCutoff) peakTimes.shift();
+    cadenceVal = peakTimes.length >= 2 ? Math.round(peakTimes.length / 8 * 60) : 0;
+  }
 
   if (zs > ANOM_THRESH && samples.length > ANOM_WIN) {
     anomalyCount++;
@@ -1263,6 +1497,17 @@ function render(ts) {
     document.getElementById('valZ').textContent = last.z.toFixed(2);
     document.getElementById('sampleRate').textContent = displayHz + ' Hz';
 
+    if (currentMode === 'running') {
+      var ce = document.getElementById('valCadence');
+      if (cadenceVal > 0) {
+        ce.textContent = cadenceVal;
+        ce.className = 'metric-val ' + (cadenceVal >= 160 && cadenceVal <= 185 ? 'good' : cadenceVal >= 150 ? 'warn' : 'alert');
+      } else {
+        ce.textContent = '—';
+        ce.className = 'metric-val';
+      }
+    }
+
     if (bufZ_score.length > 0)
       document.getElementById('zScoreDisplay').textContent =
         bufZ_score[bufZ_score.length-1].toFixed(2);
@@ -1410,6 +1655,9 @@ document.addEventListener('touchend', function(e) {
   if (now - _lastTap < 300) e.preventDefault();
   _lastTap = now;
 }, { passive: false });
+
+// Apply mode from URL param on load
+applyMode();
 </script>
 </body>
 </html>
